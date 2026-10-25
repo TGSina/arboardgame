@@ -1,0 +1,19 @@
+{
+  "name": "arboardgame",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "vendor": "rm -rf lib/three && mkdir -p lib/three/addons/webxr && cp -r node_modules/three/build lib/three/build && cp node_modules/three/examples/jsm/webxr/ARButton.js lib/three/addons/webxr/ && cp node_modules/three/LICENSE lib/three/"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "private": "true"
+}

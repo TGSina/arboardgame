@@ -1,0 +1,14 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: #101014;
+  font-family: system-ui, sans-serif; }
+canvas { display: block; }
+
+#overlay { position: fixed; inset: 0; display: flex; flex-direction: column;
+  justify-content: space-between; align-items: center; pointer-events: none;
+  visibility: hidden; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
+body.ar-active #overlay { visibility: visible; }
+
+#status { margin-top: 12px; padding: 8px 14px; border-radius: 12px;
+  background: rgba(0,0,0,.6); color: #fff; font-size: 15px; text-align: center; }
+#reset { pointer-events: auto; margin-bottom: 16px; padding: 12px 20px; border: 0;
+  border-radius: 999px; font-size: 16px; background: #fff; color: #111; }
+#reset[hidden] { display: none; }
