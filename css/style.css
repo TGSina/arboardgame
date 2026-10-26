@@ -1,14 +1,29 @@
+[hidden] { display: none !important; }
+
 html, body { margin: 0; height: 100%; overflow: hidden; background: #101014;
   font-family: system-ui, sans-serif; }
 canvas { display: block; }
 
 #overlay { position: fixed; inset: 0; display: flex; flex-direction: column;
-  justify-content: space-between; align-items: center; pointer-events: none;
-  visibility: hidden; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
+  justify-content: space-between; align-items: center; visibility: hidden;
+  padding: env(safe-area-inset-top) 10px env(safe-area-inset-bottom); box-sizing: border-box; }
 body.ar-active #overlay { visibility: visible; }
 
-#status { margin-top: 12px; padding: 8px 14px; border-radius: 12px;
-  background: rgba(0,0,0,.6); color: #fff; font-size: 15px; text-align: center; }
-#reset { pointer-events: auto; margin-bottom: 16px; padding: 12px 20px; border: 0;
-  border-radius: 999px; font-size: 16px; background: #fff; color: #111; }
-#reset[hidden] { display: none; }
+/* full-screen layer that receives taps and pinch gestures */
+#touchpad { position: absolute; inset: 0; touch-action: none; }
+
+#top, #controls { position: relative; z-index: 1; pointer-events: none; width: 100%;
+  display: flex; flex-direction: column; align-items: center; }
+
+#status { margin-top: 10px; padding: 8px 14px; border-radius: 12px;
+  background: rgba(0,0,0,.65); color: #fff; font-size: 15px; text-align: center; }
+
+#hud { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; max-width: 100%;
+  box-sizing: border-box; background: rgba(0,0,0,.7); color: #9fffb0;
+  font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; text-align: left;
+  max-height: 46vh; overflow: hidden; align-self: stretch; }
+
+#controls { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin-bottom: 14px; }
+#controls button { pointer-events: auto; padding: 12px 16px; border: 0; border-radius: 999px;
+  font-size: 16px; background: #fff; color: #111; min-width: 48px; }

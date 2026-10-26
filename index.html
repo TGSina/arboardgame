@@ -11,8 +11,18 @@
 </head>
 <body>
   <div id="overlay">
-    <div id="status"></div>
-    <button id="reset" hidden>Re-place board</button>
+    <div id="touchpad"></div>
+    <div id="top">
+      <div id="status"></div>
+      <pre id="hud"></pre>
+    </div>
+    <div id="controls">
+      <button id="btn-zoom-out">−</button>
+      <button id="btn-zoom-in">+</button>
+      <button id="btn-debug">Debug: ON</button>
+      <button id="btn-anchor">Anchor: ON</button>
+      <button id="reset" hidden>Re-place</button>
+    </div>
   </div>
   <script type="module" src="./js/main.js"></script>
 </body>
