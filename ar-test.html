@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <script src="./js/xr-compat.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AR smoke test</title>
+  <script type="importmap">{ "imports": { "three": "./lib/three/build/three.module.js" } }</script>
+  <style>
+    html, body { margin: 0; height: 100%; background: #202030; font-family: system-ui; }
+    #ov { position: fixed; inset: 0; visibility: hidden; pointer-events: none; }
+    body.ar #ov { visibility: visible; }
+    #info { margin: 8px; padding: 8px; border-radius: 8px; background: rgba(0,0,0,.65);
+            color: #9fffb0; font: 12px/1.4 monospace; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<div id="ov"><pre id="info"></pre></div>
+<script type="module">
+import * as THREE from 'three';
+import { ARButton } from './lib/three/addons/webxr/ARButton.js';
+
+const q = new URLSearchParams(location.search);
+const useOverlay = q.get('overlay') === '1';
+const aa = q.get('aa') === '1';
+const info = document.getElementById('info');
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 50);
+const renderer = new THREE.WebGLRenderer({ antialias: aa, alpha: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local');          // origin = where you start AR
+document.body.appendChild(renderer.domElement);
+
+const opts = useOverlay
+  ? { optionalFeatures: ['dom-overlay'], domOverlay: { root: document.getElementById('ov') } }
+  : {};
+document.body.appendChild(ARButton.createButton(renderer, opts));
+
+const mk = (color, s = 0.15) =>
+  new THREE.Mesh(new THREE.BoxGeometry(s, s, s), new THREE.MeshBasicMaterial({ color }));
+
+const ring = [
+  [0, 0, -1, 0xff2222], [1, 0, 0, 0x22ff22], [-1, 0, 0, 0x2222ff],
+  [0, 0, 1, 0xffff22], [0, 1, 0, 0xff22ff], [0, -1, 0, 0x22ffff]
+].map(([x, y, z, c]) => { const m = mk(c); m.position.set(x, y, z); scene.add(m); return m; });
+scene.add(new THREE.AxesHelper(0.5));
+
+const headCube = mk(0xff8800, 0.08);                 // always in front of your face
+scene.add(headCube);
+
+renderer.xr.addEventListener('sessionstart', () => document.body.classList.add('ar'));
+renderer.xr.addEventListener('sessionend', () => document.body.classList.remove('ar'));
+
+let frames = 0, lastErr = 'none', pos = 'n/a';
+renderer.setAnimationLoop((t, frame) => {
+  ring.forEach((m) => { m.rotation.y = t / 1000; });
+  if (frame) {
+    const pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
+    if (pose) {
+      const T = pose.transform;
+      headCube.position.set(T.position.x, T.position.y, T.position.z);
+      headCube.quaternion.set(T.orientation.x, T.orientation.y, T.orientation.z, T.orientation.w);
+      headCube.translateZ(-0.6).translateY(-0.12).rotateY(t / 700);
+      pos = `${T.position.x.toFixed(2)}, ${T.position.y.toFixed(2)}, ${T.position.z.toFixed(2)}`;
+    }
+  }
+  renderer.render(scene, camera);
+
+  frames++;
+  const err = renderer.getContext().getError();
+  if (err) lastErr = '0x' + err.toString(16);
+  if (useOverlay && frames % 10 === 0) {
+    const s = renderer.xr.getSession();
+    const bl = s?.renderState?.baseLayer;
+    info.textContent = [
+      `frames ${frames}   presenting ${renderer.xr.isPresenting}`,
+      `draw calls ${renderer.info.render.calls}  triangles ${renderer.info.render.triangles}`,
+      `viewer pos ${pos}`,
+      `blend mode ${s?.environmentBlendMode}`,
+      `baseLayer ${bl ? bl.framebufferWidth + 'x' + bl.framebufferHeight + ' aa=' + bl.antialias : 'none (projection layer)'}`,
+      `GL error ${lastErr}`,
+      `features ${(s?.enabledFeatures ?? []).join(', ')}`,
+      `layers disabled by compat: ${window.__xrLayersDisabled}`,
+      `${navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0]}  overlay=${useOverlay} aa=${aa}`
+    ].join('\n');
+  }
+});
+</script>
+</body>
+</html>
