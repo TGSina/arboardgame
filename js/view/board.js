@@ -33,7 +33,7 @@ function makeBoardTexture() {
 
   for (let r = 0; r < 8; r++) {
     for (let col = 0; col < 8; col++) {
-      g.fillStyle = (r + col) % 2 === 0 ? '#f5ecd0' : '#3f7d3a';
+      g.fillStyle = isDarkSquare(col, r) ? '#3f7d3a' : '#f5ecd0';
       g.fillRect(border + col * s, border + r * s, s, s);
     }
   }
@@ -77,63 +77,7 @@ export function createBoard() {
   return { group, surface };
 }
 
-// ---- Pawns -------------------------------------------------------------
-const K = 0.95;
-const PROFILE = [
-  [0, 0], [0.018, 0], [0.019, 0.003], [0.017, 0.006], [0.011, 0.010], [0.008, 0.016],
-  [0.0075, 0.024], [0.0115, 0.026], [0.0115, 0.029], [0.0075, 0.0305], [0, 0.0305]
-].map(([r, h]) => new THREE.Vector2(r * K, h * K));
-
-const bodyGeo = new THREE.LatheGeometry(PROFILE, 48);
-const headGeo = new THREE.SphereGeometry(0.0105 * K, 32, 20);
-const HEAD_Y = 0.0385 * K;
-const outlineWhite = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, side: THREE.BackSide });
-const outlineBlack = new THREE.MeshBasicMaterial({ color: 0xe8e8e8, side: THREE.BackSide });
-
-export function createPawn(color, col, row) {
-  const white = color === 'white';
-  const mat = new THREE.MeshStandardMaterial({
-    color: white ? 0xfff6e0 : 0x24242b, roughness: white ? 0.35 : 0.3, metalness: 0
-  });
-
-  const body = new THREE.Mesh(bodyGeo, mat);
-  const head = new THREE.Mesh(headGeo, mat);
-  head.position.y = HEAD_Y;
-  body.castShadow = head.castShadow = true;
-  body.receiveShadow = head.receiveShadow = true;
-
-  // back-face outline so pawns stay readable on any real-world surface
-  const oMat = white ? outlineWhite : outlineBlack;
-  const bodyOutline = new THREE.Mesh(bodyGeo, oMat);
-  const headOutline = new THREE.Mesh(headGeo, oMat);
-  bodyOutline.scale.setScalar(1.12);
-  headOutline.scale.setScalar(1.12);
-  headOutline.position.y = HEAD_Y;
-  bodyOutline.raycast = headOutline.raycast = () => {};
-
-  const pawn = new THREE.Group();
-  pawn.add(body, head, bodyOutline, headOutline);
-  pawn.position.copy(squareToLocal(col, row));
-  pawn.userData = { isPawn: true, color, col, row, mat, target: pawn.position.clone() };
-  return pawn;
+export function isDarkSquare(col, row) {
+  return (col + row) % 2 !== 0;
 }
 
-export function createPawns() {
-  const pawns = [];
-  for (let c = 0; c < 8; c++) {
-    pawns.push(createPawn('black', c, 1));
-    pawns.push(createPawn('white', c, 6));
-  }
-  return pawns;
-}
-
-export function createSelectionRing() {
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.019, 0.025, 48).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0x00e5ff, side: THREE.DoubleSide })
-  );
-  ring.position.y = SURFACE_Y + 0.001;
-  ring.visible = false;
-  ring.raycast = () => {};
-  return ring;
-}

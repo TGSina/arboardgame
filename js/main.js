@@ -1,11 +1,11 @@
 // Composition root: creates the modules and wires them together. No business logic lives here.
+import { Game } from './core/game.js';
 import { FLAGS, SCALE, TAP_DEDUPE_MS } from './config.js';
 import { createXRSession } from './xr/session.js';
 import { createPlacement } from './xr/placement.js';
 import { setupGestures } from './xr/gestures.js';
 import { BOARD_SIZE } from './view/board.js';
 import { createBoardScene } from './view/board-scene.js';
-import { createInteraction } from './view/interaction.js';
 import { createHud } from './ui/hud.js';
 import { createDebug, createBoardDebug } from './debug/debug.js';
 import { createDebugHud } from './debug/debug-hud.js';
@@ -20,14 +20,20 @@ const el = {
 // ---- modules
 const hud = createHud({ statusEl: el.status, hudEl: el.hud, btnDebug: el.debug, btnAnchor: el.anchor });
 const app = createXRSession({ overlay: el.overlay, log: hud.log });
-const content = createBoardScene();
+const requestedFen = new URLSearchParams(location.search).get('fen');
+let game;
+try {
+  game = new Game(requestedFen === null ? undefined : requestedFen);
+} catch (err) {
+  game = new Game();
+  hud.log(`invalid ?fen=: ${err.message}`);
+}
+const content = createBoardScene({ game });
 const boardDebug = createBoardDebug();
 content.boardRoot.add(boardDebug);
 const dbg = createDebug(app.scene);
-
 const controller = app.renderer.xr.getController(0);
 app.scene.add(controller);
-const interaction = createInteraction({ camera: app.camera, controller, content });
 
 const placement = createPlacement({
   app,
@@ -37,13 +43,11 @@ const placement = createPlacement({
   hooks: {
     onReset() {
       el.reset.hidden = true;
-      interaction.select(null);
       hud.setStatus('Scan a flat surface (move the phone slowly). Tap when the cyan grid sits where you want the board. Pinch to resize.');
     },
     onPlaced() {
       el.reset.hidden = false;
-      interaction.select(null);
-      hud.setStatus('Tap a pawn to select it, then tap a square to move it. Pinch to resize.');
+      hud.setStatus('Board placed.');
       hud.log('board placed');
     }
   }
@@ -53,31 +57,26 @@ const debugHud = createDebugHud({ app, placement, dbg, content, hud });
 // ---- state
 let debugOn = false;      // debug HUD + layers (see setDebug)
 let attaching = false;    // debug hit-test fan is being created
-let lastTapTime = 0;
+let lastTapTime = -Infinity;
 let pinchBase = 1;
 let lastHudTs = 0;
 
-// ---- input: one tap router for XR "select" and DOM taps
-const gestures = setupGestures(el.touchpad, {
-  onTap: (x, y) => handleTap('dom', x, y),
+// M2 keeps pinch scaling; legal piece interaction is added in M3.
+let gestures;
+function requestPlacementFromInput() {
+  if (placement.state.phase !== 'placing') return;
+  const now = performance.now();
+  if (now - lastTapTime < TAP_DEDUPE_MS || gestures.recentlyGestured()) return;
+  lastTapTime = now;
+  placement.requestPlace();
+}
+
+gestures = setupGestures(el.touchpad, {
+  onTap: requestPlacementFromInput,
   onPinchStart: () => { pinchBase = content.boardRoot.scale.x; },
   onPinch: (ratio) => hud.flashStatus(`Board scale ×${content.setBoardScale(pinchBase * ratio).toFixed(2)}`)
 });
-
-function handleTap(kind, x, y) {
-  const now = performance.now();
-  if (now - lastTapTime < TAP_DEDUPE_MS) return;     // XR select + DOM tap can both fire: take one
-  if (gestures.recentlyGestured()) return;           // ignore the end of a pinch
-  lastTapTime = now;
-
-  if (placement.state.phase === 'placing') {
-    placement.requestPlace();                        // handled inside the next XR frame
-    return;
-  }
-  interaction.pick(kind, x, y);
-}
-
-controller.addEventListener('select', () => handleTap('xr'));
+controller.addEventListener('select', requestPlacementFromInput);
 
 // ---- buttons
 document.querySelectorAll('#controls button').forEach((b) =>
@@ -120,7 +119,6 @@ function setDebug(on) {
 
 // ---- frame hooks
 app.onXRFrame((ts, frame, refSpace) => { if (debugOn && dbg.ready) dbg.update(frame, refSpace); });
-app.onTick(interaction.animate);
 app.onAfterRender((ts) => {
   if (debugOn && ts - lastHudTs > 250) { lastHudTs = ts; debugHud.update(); }
 });
