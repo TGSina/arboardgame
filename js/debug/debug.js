@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FULL_SIZE } from './board.js';
+import { FULL_SIZE } from '../view/board.js';
 
 const GRID = 2;          // (2*GRID+1)^2 = 25 debug rays
 const SPREAD = 0.22;     // ray fan spread (about ±24° total)
@@ -143,6 +143,7 @@ export function createDebug(scene) {
   return {
     root, stats, attach, detach, clear, update,
     get ready() { return sources.length > 0; },
+    get sourceCount() { return sources.length; },
     setVisible(v) { root.visible = v; }
   };
 }
