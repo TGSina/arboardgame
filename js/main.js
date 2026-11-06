@@ -6,7 +6,11 @@ import { createPlacement } from './xr/placement.js';
 import { setupGestures } from './xr/gestures.js';
 import { BOARD_SIZE } from './view/board.js';
 import { createBoardScene } from './view/board-scene.js';
+import { MoveAnimator } from './view/animations.js';
+import { createInteraction } from './view/interaction.js';
+import { MoveHints } from './view/move-hints.js';
 import { createHud } from './ui/hud.js';
+import { createPromotionDialog } from './ui/promotion.js';
 import { createDebug, createBoardDebug } from './debug/debug.js';
 import { createDebugHud } from './debug/debug-hud.js';
 
@@ -14,7 +18,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   overlay: $('overlay'), touchpad: $('touchpad'), status: $('status'), hud: $('hud'),
   reset: $('reset'), debug: $('btn-debug'), anchor: $('btn-anchor'),
-  zoomIn: $('btn-zoom-in'), zoomOut: $('btn-zoom-out')
+  zoomIn: $('btn-zoom-in'), zoomOut: $('btn-zoom-out'), promotion: $('promotion-dialog')
 };
 
 // ---- modules
@@ -29,11 +33,18 @@ try {
   hud.log(`invalid ?fen=: ${err.message}`);
 }
 const content = createBoardScene({ game });
+const hints = new MoveHints({ root: content.boardRoot });
+const animator = new MoveAnimator({ boardView: content.boardView });
 const boardDebug = createBoardDebug();
 content.boardRoot.add(boardDebug);
 const dbg = createDebug(app.scene);
 const controller = app.renderer.xr.getController(0);
 app.scene.add(controller);
+let interaction;
+const promotionDialog = createPromotionDialog({
+  element: el.promotion,
+  onChoose: (piece) => interaction?.choosePromotion(piece)
+});
 
 const placement = createPlacement({
   app,
@@ -43,16 +54,27 @@ const placement = createPlacement({
   hooks: {
     onReset() {
       el.reset.hidden = true;
+      interaction?.clearSelection();
       hud.setStatus('Scan a flat surface (move the phone slowly). Tap when the cyan grid sits where you want the board. Pinch to resize.');
     },
     onPlaced() {
       el.reset.hidden = false;
-      hud.setStatus('Board placed.');
+      hud.setStatus(`${game.turn()[0].toUpperCase() + game.turn().slice(1)} to move.`);
       hud.log('board placed');
     }
   }
 });
 const debugHud = createDebugHud({ app, placement, dbg, content, hud });
+interaction = createInteraction({
+  camera: app.camera,
+  controller,
+  content,
+  game,
+  hints,
+  animator,
+  hud,
+  onPromotionRequired: (color) => promotionDialog.show(color)
+});
 
 // ---- state
 let debugOn = false;      // debug HUD + layers (see setDebug)
@@ -61,22 +83,31 @@ let lastTapTime = -Infinity;
 let pinchBase = 1;
 let lastHudTs = 0;
 
-// M2 keeps pinch scaling; legal piece interaction is added in M3.
 let gestures;
-function requestPlacementFromInput() {
-  if (placement.state.phase !== 'placing') return;
+function handleInput(kind, x, y) {
   const now = performance.now();
   if (now - lastTapTime < TAP_DEDUPE_MS || gestures.recentlyGestured()) return;
   lastTapTime = now;
-  placement.requestPlace();
+  if (placement.state.phase === 'placing') {
+    placement.requestPlace();
+    return;
+  }
+  if (!animator.busy && !promotionDialog.open) interaction.pick(kind, x, y);
 }
 
 gestures = setupGestures(el.touchpad, {
-  onTap: requestPlacementFromInput,
-  onPinchStart: () => { pinchBase = content.boardRoot.scale.x; },
-  onPinch: (ratio) => hud.flashStatus(`Board scale ×${content.setBoardScale(pinchBase * ratio).toFixed(2)}`)
+  onTap: (x, y) => handleInput('dom', x, y),
+  onPinchStart: () => {
+    if (animator.busy || promotionDialog.open) return;
+    pinchBase = content.boardRoot.scale.x;
+  },
+  onPinch: (ratio) => {
+    if (!animator.busy && !promotionDialog.open) {
+      hud.flashStatus(`Board scale ×${content.setBoardScale(pinchBase * ratio).toFixed(2)}`);
+    }
+  }
 });
-controller.addEventListener('select', requestPlacementFromInput);
+controller.addEventListener('select', () => handleInput('xr'));
 
 // ---- buttons
 document.querySelectorAll('#controls button').forEach((b) =>
@@ -119,6 +150,7 @@ function setDebug(on) {
 
 // ---- frame hooks
 app.onXRFrame((ts, frame, refSpace) => { if (debugOn && dbg.ready) dbg.update(frame, refSpace); });
+app.onTick((ts) => animator.update(ts));
 app.onAfterRender((ts) => {
   if (debugOn && ts - lastHudTs > 250) { lastHudTs = ts; debugHud.update(); }
 });
@@ -132,6 +164,9 @@ app.onSessionStart(() => {
 });
 app.onSessionEnd(() => {
   document.body.classList.remove('ar-active');
+  promotionDialog.close();
+  interaction.cancelPromotion();
+  interaction.clearSelection();
   dbg.detach();
   dbg.clear();
 });

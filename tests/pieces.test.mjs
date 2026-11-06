@@ -40,6 +40,9 @@ test('start position renders 32 stable ids on the expected squares', () => {
   assert.equal(renderedIds.length, 32);
   assert.equal(new Set(renderedIds).size, 32);
   assert.deepEqual(new Set(renderedIds), new Set(game.pieces().map((piece) => piece.id)));
+  assert.equal(view.pickMesh.count, 32);
+  assert.equal(new Set(view.pickIds).size, 32);
+  assert.equal(view.getPieceIdAtPick(view.pickIds.indexOf('white-p-e2')), 'white-p-e2');
 
   const { position: queen } = instanceTransform(view, 'white-q-d1');
   assert.ok(Math.abs(queen.x + 0.025) < 1e-6);
@@ -74,6 +77,12 @@ test('FEN state and later captures and promotions sync without losing piece ids'
   assert.equal([...view.batches.values()].reduce((count, batch) => count + batch.ids.length, 0), 31);
   assert.equal(view.getPieceInstance('black-p-d7'), null);
   assert.equal(view.getPieceInstance('white-p-e2').type, 'p');
+  const movedPawn = view.getPieceInstance('white-p-e2');
+  const movedMatrix = new THREE.Matrix4();
+  const movedPosition = new THREE.Vector3();
+  movedPawn.batch.surface.getMatrixAt(movedPawn.instanceId, movedMatrix);
+  movedMatrix.decompose(movedPosition, new THREE.Quaternion(), new THREE.Vector3());
+  assert.ok(Math.abs(movedPosition.z + 0.025) < 1e-6);
 
   const promotionGame = new Game('8/P7/8/8/8/8/7k/K7 w - - 0 1');
   const promotionView = new BoardView(promotionGame);

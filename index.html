@@ -24,6 +24,17 @@
       <button id="btn-anchor">Anchor: ON</button>
       <button id="reset" hidden>Re-place</button>
     </div>
+    <div id="promotion-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="promotion-title">
+      <div class="promotion-panel">
+        <p id="promotion-title">Pawn promotion</p>
+        <div class="promotion-choices">
+          <button type="button" data-promotion="q" aria-label="Promote to queen">Q</button>
+          <button type="button" data-promotion="r" aria-label="Promote to rook">R</button>
+          <button type="button" data-promotion="b" aria-label="Promote to bishop">B</button>
+          <button type="button" data-promotion="n" aria-label="Promote to knight">N</button>
+        </div>
+      </div>
+    </div>
   </div>
   <script type="module" src="./js/main.js"></script>
 </body>
