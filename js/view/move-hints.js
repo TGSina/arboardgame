@@ -5,6 +5,7 @@ import { squareToColRow } from '../core/squares.js';
 const MAX_HINTS = 27;
 const HINT_Y = SURFACE_Y + 0.001;
 const SELECTED_COLOR = new THREE.Color(0x00d8ff);
+const DEBUG_SELECTED_COLOR = new THREE.Color(0xffe34d);
 const LAST_FROM_COLOR = new THREE.Color(0xffc857);
 const LAST_TO_COLOR = new THREE.Color(0xff7a45);
 
@@ -15,6 +16,7 @@ export class MoveHints {
     this.transform = new THREE.Object3D();
     this.selectedSquare = null;
     this.lastMove = null;
+    this.selectionDebug = false;
 
     this.emptyTargets = new THREE.InstancedMesh(
       new THREE.CircleGeometry(0.009, 20).rotateX(-Math.PI / 2),
@@ -67,6 +69,11 @@ export class MoveHints {
     this.#updateFocus();
   }
 
+  setSelectionDebug(on) {
+    this.selectionDebug = on;
+    this.#updateFocus();
+  }
+
   setLastMove(move) {
     this.lastMove = move ? { from: move.from, to: move.to } : null;
     this.#updateFocus();
@@ -99,7 +106,7 @@ export class MoveHints {
     if (this.selectedSquare) {
       const selected = squareToColRow(this.selectedSquare);
       this.#setSquareMatrix(this.focus, count, selected.col, selected.row, HINT_Y);
-      this.focus.setColorAt(count++, SELECTED_COLOR);
+      this.focus.setColorAt(count++, this.selectionDebug ? DEBUG_SELECTED_COLOR : SELECTED_COLOR);
     }
     this.focus.count = count;
     this.focus.instanceMatrix.needsUpdate = true;

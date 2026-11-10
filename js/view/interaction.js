@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { colRowToSquare } from '../core/squares.js';
 import { localToSquare } from './board.js';
 
-export function createInteraction({ camera, controller, content, game, hints, animator, hud, onPromotionRequired }) {
+export function createInteraction({ camera, getXRCamera, controller, content, game, hints, animator, hud, onPromotionRequired, selectionDebug = false }) {
   const { boardRoot, surface, boardView } = content;
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const localPoint = new THREE.Vector3();
   let selectedSquare = null;
   let pendingPromotion = null;
+  let showSelectionDebug = selectionDebug;
 
   function pieceAt(square) {
     return game.pieces().find((piece) => piece.square === square) ?? null;
@@ -136,22 +137,24 @@ export function createInteraction({ camera, controller, content, game, hints, an
       raycaster.setFromXRController(controller);
     } else {
       ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
-      raycaster.setFromCamera(ndc, camera);
-    }
-
-    const pieceHit = raycaster.intersectObject(boardView.pickMesh, false)[0];
-    if (pieceHit) {
-      const id = boardView.getPieceIdAtPick(pieceHit.instanceId);
-      const piece = game.pieces().find((candidate) => candidate.id === id);
-      if (piece) tapPiece(piece.square);
-      return;
+      const xrCamera = getXRCamera?.();
+      const viewCamera = xrCamera?.cameras?.[0] ?? camera;
+      raycaster.setFromCamera(ndc, viewCamera);
     }
 
     const surfaceHit = raycaster.intersectObject(surface, false)[0];
     if (!surfaceHit) return;
     boardRoot.worldToLocal(localPoint.copy(surfaceHit.point));
     const square = localToSquare(localPoint.x, localPoint.z);
-    if (square) tapSquare(colRowToSquare(square.col, square.row));
+    if (!square) return;
+
+    const squareName = colRowToSquare(square.col, square.row);
+    const piece = pieceAt(squareName);
+    if (showSelectionDebug) {
+      hud.log?.(`tap ${squareName}${piece ? ` (${piece.color} ${piece.type})` : ' (empty)'}`);
+    }
+    if (piece) tapPiece(squareName);
+    else tapSquare(squareName);
   }
 
   return {
@@ -161,6 +164,10 @@ export function createInteraction({ camera, controller, content, game, hints, an
     choosePromotion,
     cancelPromotion,
     clearSelection,
+    setSelectionDebug(on) {
+      showSelectionDebug = on;
+      hints.setSelectionDebug?.(on);
+    },
     get selectedSquare() { return selectedSquare; },
     get promotionPending() { return pendingPromotion !== null; },
     get busy() { return animator.busy || pendingPromotion !== null; }

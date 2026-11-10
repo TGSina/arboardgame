@@ -65,24 +65,25 @@ const placement = createPlacement({
   }
 });
 const debugHud = createDebugHud({ app, placement, dbg, content, hud });
+let debugOn = false;      // debug HUD + layers (see setDebug)
+let attaching = false;    // debug hit-test fan is being created
+let lastTapTime = -Infinity;
+let pinchBase = 1;
+let lastHudTs = 0;
 interaction = createInteraction({
   camera: app.camera,
+  getXRCamera: () => app.renderer.xr.getCamera(app.camera),
   controller,
   content,
   game,
   hints,
   animator,
   hud,
+  selectionDebug: FLAGS.selectionDebug,
   onPromotionRequired: (color) => promotionDialog.show(color)
 });
 
 // ---- state
-let debugOn = false;      // debug HUD + layers (see setDebug)
-let attaching = false;    // debug hit-test fan is being created
-let lastTapTime = -Infinity;
-let pinchBase = 1;
-let lastHudTs = 0;
-
 let gestures;
 function handleInput(kind, x, y) {
   const now = performance.now();
@@ -136,6 +137,7 @@ async function attachDebugSources() {
 
 function setDebug(on) {
   debugOn = on;
+  interaction.setSelectionDebug(on || FLAGS.selectionDebug);
   hud.setDebugUi(on);
   hud.setAnchorButton(placement.state.useAnchor);
   dbg.setVisible(on);
@@ -174,4 +176,4 @@ app.onSessionEnd(() => {
 addEventListener('error', (e) => hud.log('ERR ' + e.message));
 addEventListener('unhandledrejection', (e) => hud.log('PROMISE ' + (e.reason?.message || e.reason)));
 
-setDebug(FLAGS.debug);
+setDebug(FLAGS.debug || FLAGS.selectionDebug);

@@ -99,18 +99,41 @@ function makeInteraction(game, onPromotionRequired = () => {}) {
   const boardRoot = new THREE.Group();
   const boardView = new BoardView(game);
   boardRoot.add(boardView.root);
+  const surface = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.44, 0.44).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial()
+  );
+  surface.position.y = SURFACE_Y;
+  boardRoot.add(surface);
   const hints = new MoveHints({ root: boardRoot });
   const animator = new MoveAnimator({ boardView, duration: 10 });
   const feedback = [];
   const hud = { flashStatus: (text) => feedback.push(text), setStatus: (text) => feedback.push(text) };
+  const controller = new THREE.Group();
   const interaction = createInteraction({
     camera: new THREE.PerspectiveCamera(),
-    controller: new THREE.Group(),
-    content: { boardRoot, boardView, surface: new THREE.Mesh() },
+    controller,
+    content: { boardRoot, boardView, surface },
     game, hints, animator, hud, onPromotionRequired
   });
-  return { interaction, boardView, hints, animator, feedback };
+  return { interaction, boardRoot, controller, boardView, hints, animator, feedback };
 }
+
+test('ray selection uses the square at board height instead of a neighboring piece hitbox', () => {
+  const { interaction, boardRoot, controller } = makeInteraction(new Game());
+  const target = new THREE.Vector3(0.049, SURFACE_Y, 0.125);
+  controller.position.set(0.075, 1, 0.125);
+  controller.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 0, -1),
+    target.clone().sub(controller.position).normalize()
+  );
+  controller.updateMatrixWorld(true);
+  boardRoot.updateMatrixWorld(true);
+
+  interaction.pick('xr');
+
+  assert.equal(interaction.selectedSquare, 'e2');
+});
 
 test('selection follows turn, shows only legal targets, switches and deselects', () => {
   const game = new Game();

@@ -12,21 +12,31 @@ body.ar-active #overlay { visibility: visible; }
 /* full-screen layer that receives taps and pinch gestures */
 #touchpad { position: absolute; inset: 0; touch-action: none; }
 
-#top, #controls { position: relative; z-index: 1; pointer-events: none; width: 100%;
-  display: flex; flex-direction: column; align-items: center; }
+#top { position: fixed; z-index: 1; pointer-events: none;
+  top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left));
+  width: min(58vw, 360px); display: flex; flex-direction: column; align-items: flex-start; }
 
 #status { margin-top: 10px; padding: 8px 14px; border-radius: 12px;
-  background: rgba(0,0,0,.65); color: #fff; font-size: 15px; text-align: center; }
+  background: rgba(0,0,0,.65); color: #fff; font-size: 15px; text-align: left; }
 
 #hud { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; max-width: 100%;
   box-sizing: border-box; background: rgba(0,0,0,.7); color: #9fffb0;
   font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; text-align: left;
   max-height: 46vh; overflow: hidden; align-self: stretch; }
 
-#controls { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px;
-  margin-bottom: 14px; }
+#controls { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+.control-group { position: absolute; display: flex; gap: 8px; pointer-events: auto; }
+#debug-controls { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right));
+  flex-direction: column; align-items: flex-end; }
+#board-controls { right: max(10px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
 #controls button { pointer-events: auto; padding: 12px 16px; border: 0; border-radius: 999px;
   font-size: 16px; background: #fff; color: #111; min-width: 48px; }
+
+@media (max-width: 420px) {
+  #top { width: min(52vw, 220px); }
+  #status { font-size: 13px; }
+  #controls button { padding: 10px 12px; font-size: 14px; }
+}
 
 #promotion-dialog { position: fixed; inset: 0; z-index: 3; display: grid; place-items: center;
   padding: 16px; box-sizing: border-box; background: rgba(0,0,0,.62); pointer-events: auto; }

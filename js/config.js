@@ -1,7 +1,9 @@
 // App-wide constants and URL flags. Browser-only (reads location).
 export const FLAGS = Object.freeze({
   // ?debug=1 starts with the debug HUD and debug layers on (the Debug button toggles them at runtime)
-  debug: new URLSearchParams(location.search).get('debug') === '1'
+  debug: new URLSearchParams(location.search).get('debug') === '1',
+  // ?selectionDebug=1 highlights and logs each board-square selection
+  selectionDebug: new URLSearchParams(location.search).get('selectionDebug') === '1'
 });
 
 export const SCALE = Object.freeze({ MIN: 0.4, MAX: 3, STEP: 1.15 });

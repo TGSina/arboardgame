@@ -18,11 +18,15 @@
       <pre id="hud"></pre>
     </div>
     <div id="controls">
-      <button id="btn-zoom-out">−</button>
-      <button id="btn-zoom-in">+</button>
-      <button id="btn-debug">Debug: ON</button>
-      <button id="btn-anchor">Anchor: ON</button>
-      <button id="reset" hidden>Re-place</button>
+      <div id="debug-controls" class="control-group">
+        <button id="btn-debug">Debug: ON</button>
+        <button id="btn-anchor">Anchor: ON</button>
+      </div>
+      <div id="board-controls" class="control-group">
+        <button id="btn-zoom-out" aria-label="Decrease board size">−</button>
+        <button id="btn-zoom-in" aria-label="Increase board size">+</button>
+        <button id="reset" hidden>Re-place</button>
+      </div>
     </div>
     <div id="promotion-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="promotion-title">
       <div class="promotion-panel">
