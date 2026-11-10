@@ -11,6 +11,7 @@ export function createPlacement({ app, boardRoot, boardSize, hooks = {}, log = (
     anchorState: 'none',
     useAnchor: true,
     anchorPoseOk: false,
+    baseYaw: 0,
     pendingPlace: false
   };
 
@@ -65,6 +66,9 @@ export function createPlacement({ app, boardRoot, boardSize, hooks = {}, log = (
     state.anchorState = 'none';
     state.phase = 'placing';
     state.pendingPlace = false;
+    state.baseYaw = 0;
+    boardRoot.position.set(0, 0, 0);
+    boardRoot.rotation.set(0, 0, 0);
     group.visible = false;
     hooks.onReset?.();
   }
@@ -73,7 +77,8 @@ export function createPlacement({ app, boardRoot, boardSize, hooks = {}, log = (
     group.matrix.copy(reticle.matrix);
     group.matrixWorldNeedsUpdate = true;
     group.updateMatrixWorld(true);
-    boardRoot.rotation.y = yawTowardCamera(group);   // your side faces you
+    state.baseYaw = yawTowardCamera(group);
+    boardRoot.rotation.y = state.baseYaw;   // your side faces you
 
     group.visible = true;
     state.phase = 'playing';

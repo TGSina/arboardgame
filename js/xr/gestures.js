@@ -1,11 +1,16 @@
 // Tap + two-finger pinch detection on a DOM element (works inside WebXR DOM overlay).
 export function setupGestures(el, cb) {
   const pointers = new Map();
-  let pinchStart = 0, tap = null, lastGestureTime = 0;
+  let pinchStart = null, tap = null, lastGestureTime = 0;
 
-  const dist = () => {
+  const pairState = () => {
     const [a, b] = [...pointers.values()];
-    return Math.hypot(a.x - b.x, a.y - b.y);
+    return {
+      centerX: (a.x + b.x) / 2,
+      centerY: (a.y + b.y) / 2,
+      distance: Math.hypot(a.x - b.x, a.y - b.y),
+      angle: Math.atan2(b.y - a.y, b.x - a.x)
+    };
   };
 
   // stop the 2nd finger from also producing an XR "select"
@@ -14,11 +19,14 @@ export function setupGestures(el, cb) {
   el.addEventListener('pointerdown', (e) => {
     el.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) tap = { x: e.clientX, y: e.clientY, t: performance.now(), ok: true };
+    if (pointers.size === 1) {
+      tap = { x: e.clientX, y: e.clientY, t: performance.now(), ok: true };
+      cb.onDragStart?.(e.clientX, e.clientY);
+    }
     if (pointers.size === 2) {
       if (tap) tap.ok = false;
-      pinchStart = dist();
-      cb.onPinchStart?.();
+      pinchStart = pairState();
+      cb.onPinchStart?.(pinchStart);
     }
   });
 
@@ -26,9 +34,25 @@ export function setupGestures(el, cb) {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 12) tap.ok = false;
-    if (pointers.size === 2 && pinchStart > 0) {
+    if (pointers.size === 1 && tap && !tap.ok) {
       lastGestureTime = performance.now();
-      cb.onPinch(dist() / pinchStart);
+      cb.onDrag?.(e.clientX, e.clientY);
+    }
+    if (pointers.size === 2 && pinchStart?.distance > 0) {
+      lastGestureTime = performance.now();
+      const current = pairState();
+      const angleDelta = Math.atan2(
+        Math.sin(current.angle - pinchStart.angle),
+        Math.cos(current.angle - pinchStart.angle)
+      );
+      const transform = {
+        centerX: current.centerX,
+        centerY: current.centerY,
+        ratio: current.distance / pinchStart.distance,
+        angleDelta
+      };
+      cb.onPinch?.(transform.ratio, transform);
+      cb.onTransform?.(transform);
     }
   });
 
@@ -42,7 +66,10 @@ export function setupGestures(el, cb) {
     } else if (e.type === 'pointerup' && tap?.ok && performance.now() - tap.t < 500) {
       cb.onTap(e.clientX, e.clientY);
     }
-    if (pointers.size === 0) tap = null;
+    if (pointers.size === 0) {
+      tap = null;
+      pinchStart = null;
+    }
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);

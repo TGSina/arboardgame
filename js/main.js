@@ -4,6 +4,7 @@ import { FLAGS, SCALE, TAP_DEDUPE_MS } from './config.js';
 import { createXRSession } from './xr/session.js';
 import { createPlacement } from './xr/placement.js';
 import { setupGestures } from './xr/gestures.js';
+import { BoardManipulation } from './xr/manipulation.js';
 import { BOARD_SIZE } from './view/board.js';
 import { createBoardScene } from './view/board-scene.js';
 import { MoveAnimator } from './view/animations.js';
@@ -18,7 +19,8 @@ import { createDebugHud } from './debug/debug-hud.js';
 const $ = (id) => document.getElementById(id);
 const el = {
   overlay: $('overlay'), touchpad: $('touchpad'), status: $('status'), hud: $('hud'),
-  reset: $('reset'), resign: $('btn-resign'), debug: $('btn-debug'), anchor: $('btn-anchor'),
+  reset: $('reset'), resetTransform: $('btn-reset-transform'), mode: $('btn-mode'), resign: $('btn-resign'),
+  debug: $('btn-debug'), anchor: $('btn-anchor'),
   zoomIn: $('btn-zoom-in'), zoomOut: $('btn-zoom-out'), promotion: $('promotion-dialog'),
   gameDialog: $('game-dialog'), gameTitle: $('game-title'), gameMessage: $('game-message'),
   gamePrimary: $('game-primary'), gameSecondary: $('game-secondary')
@@ -76,7 +78,10 @@ const placement = createPlacement({
   hooks: {
     onReset() {
       el.reset.hidden = true;
+      el.mode.hidden = true;
+      el.resetTransform.hidden = true;
       el.resign.hidden = true;
+      setEditMode(false);
       interaction?.clearSelection();
       hints.setCheckedKing(null);
       hud.setCheck(false);
@@ -84,12 +89,20 @@ const placement = createPlacement({
     },
     onPlaced() {
       el.reset.hidden = false;
+      el.mode.hidden = false;
       el.resign.hidden = false;
       updateGameStatus(game.status());
       if (game.status().over) gameDialog.showResult(game.status());
       hud.log('board placed');
     }
   }
+});
+const manipulation = new BoardManipulation({
+  camera: app.camera,
+  getXRCamera: () => app.renderer.xr.getCamera(app.camera),
+  placement,
+  boardRoot: content.boardRoot,
+  setBoardScale: content.setBoardScale
 });
 const debugHud = createDebugHud({ app, placement, dbg, content, hud });
 const gameDialog = createGameDialog({
@@ -102,6 +115,7 @@ const gameDialog = createGameDialog({
   onResign: resignGame
 });
 let debugOn = false;      // debug HUD + layers (see setDebug)
+let editMode = false;
 let attaching = false;    // debug hit-test fan is being created
 let lastTapTime = -Infinity;
 let pinchBase = 1;
@@ -131,20 +145,33 @@ function handleInput(kind, x, y) {
     placement.requestPlace();
     return;
   }
+  if (editMode) return;
   if (!animator.busy && !promotionDialog.open) interaction.pick(kind, x, y);
 }
 
 gestures = setupGestures(el.touchpad, {
   onTap: (x, y) => handleInput('dom', x, y),
-  onPinchStart: () => {
-    if (animator.busy || promotionDialog.open) return;
-    pinchBase = content.boardRoot.scale.x;
+  onDragStart: (x, y) => {
+    if (editMode && !animator.busy && !promotionDialog.open && !gameDialog.open) manipulation.beginDrag(x, y);
   },
-  onPinch: (ratio) => {
-    if (!animator.busy && !promotionDialog.open) {
-      hud.flashStatus(`Board scale ×${content.setBoardScale(pinchBase * ratio).toFixed(2)}`);
+  onDrag: (x, y) => {
+    if (editMode && !animator.busy && !promotionDialog.open && !gameDialog.open) manipulation.dragTo(x, y);
+  },
+  onPinchStart: () => {
+    if (animator.busy || promotionDialog.open || gameDialog.open) return;
+    manipulation.endDrag();
+    if (editMode) manipulation.startTransform();
+    else pinchBase = content.boardRoot.scale.x;
+  },
+  onTransform: ({ ratio, angleDelta }) => {
+    if (animator.busy || promotionDialog.open || gameDialog.open) return;
+    if (editMode) {
+      manipulation.transform({ ratio, angleDelta });
+    } else {
+      content.setBoardScale(pinchBase * ratio);
     }
-  }
+  },
+  onPinchEnd: () => manipulation.endDrag()
 });
 controller.addEventListener('select', () => handleInput('xr'));
 
@@ -156,6 +183,11 @@ const zoom = (factor) => hud.flashStatus(`Board scale ×${content.setBoardScale(
 el.zoomIn.addEventListener('click', () => zoom(SCALE.STEP));
 el.zoomOut.addEventListener('click', () => zoom(1 / SCALE.STEP));
 el.reset.addEventListener('click', () => placement.reset());
+el.mode.addEventListener('click', () => setEditMode(!editMode));
+el.resetTransform.addEventListener('click', () => {
+  manipulation.resetTransform();
+  hud.flashStatus('Board transform reset');
+});
 el.resign.addEventListener('click', () => {
   if (placement.state.phase === 'playing' && !game.status().over) gameDialog.showResign();
 });
@@ -191,7 +223,17 @@ function setDebug(on) {
   }
 }
 
+function setEditMode(on) {
+  editMode = Boolean(on && placement.state.phase === 'playing');
+  manipulation.endDrag();
+  interaction?.clearSelection();
+  el.mode.textContent = editMode ? 'Play' : 'Edit';
+  el.mode.setAttribute('aria-pressed', String(editMode));
+  el.resetTransform.hidden = !editMode;
+}
+
 function startNewGame() {
+  setEditMode(false);
   animator.cancel();
   promotionDialog.close();
   interaction.cancelPromotion();
