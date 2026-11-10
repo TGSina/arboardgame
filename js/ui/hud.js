@@ -10,6 +10,10 @@ export function createHud({ statusEl, hudEl, btnDebug, btnAnchor }) {
     statusEl.textContent = text;
   }
 
+  function setCheck(on) {
+    statusEl.classList.toggle('is-check', on);
+  }
+
   /** Shows text briefly, then restores the base status. */
   function flashStatus(text) {
     statusEl.textContent = text;
@@ -36,5 +40,5 @@ export function createHud({ statusEl, hudEl, btnDebug, btnAnchor }) {
     hudEl.textContent = text;
   }
 
-  return { setStatus, flashStatus, log, setDebugUi, setAnchorButton, render, getLog: () => logLines };
+  return { setStatus, setCheck, flashStatus, log, setDebugUi, setAnchorButton, render, getLog: () => logLines };
 }

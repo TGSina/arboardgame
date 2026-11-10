@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { colRowToSquare } from '../core/squares.js';
 import { localToSquare } from './board.js';
 
-export function createInteraction({ camera, getXRCamera, controller, content, game, hints, animator, hud, onPromotionRequired, selectionDebug = false }) {
+export function createInteraction({ camera, getXRCamera, controller, content, game, hints, animator, hud, onPromotionRequired, onStatus, onGameOver, selectionDebug = false }) {
   const { boardRoot, surface, boardView } = content;
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -43,12 +43,6 @@ export function createInteraction({ camera, getXRCamera, controller, content, ga
     return snapshot;
   }
 
-  function statusText(status) {
-    if (status.over) return `Game over: ${status.reason}.`;
-    const side = status.turn[0].toUpperCase() + status.turn.slice(1);
-    return `${side} to move${status.state === 'check' ? ' - check' : ''}.`;
-  }
-
   function attemptMove(to, promotion) {
     if (!selectedSquare || animator.busy || pendingPromotion || game.status().over) return null;
     const candidates = game.legalMovesFrom(selectedSquare).filter((move) => move.to === to);
@@ -74,7 +68,11 @@ export function createInteraction({ camera, getXRCamera, controller, content, ga
     hints.setLastMove(result.move);
     boardView.syncFrom(game);
     animator.start(result.move, before);
-    hud.setStatus(statusText(result.status));
+    hints.setCheckedKing?.(result.status.inCheck ? game.kingSquare(result.status.inCheck) : null);
+    hud.setCheck?.(result.status.state === 'check');
+    if (onStatus) onStatus(result.status, result.move.san);
+    else hud.setStatus(`${result.status.turn[0].toUpperCase() + result.status.turn.slice(1)} to move${result.status.state === 'check' ? ' - check' : ''}.`);
+    if (result.status.over) onGameOver?.(result.status);
     return result;
   }
 

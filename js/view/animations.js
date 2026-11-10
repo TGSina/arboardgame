@@ -20,6 +20,14 @@ export class MoveAnimator {
 
   get busy() { return this.active; }
 
+  cancel() {
+    this.actions.length = 0;
+    this.startedAt = null;
+    this.active = false;
+    this.boardView.captureGhost.visible = false;
+    this.boardView.promotionGhost.visible = false;
+  }
+
   start(move, beforePieces) {
     this.actions.length = 0;
     this.startedAt = null;

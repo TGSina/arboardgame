@@ -11,20 +11,23 @@ import { createInteraction } from './view/interaction.js';
 import { MoveHints } from './view/move-hints.js';
 import { createHud } from './ui/hud.js';
 import { createPromotionDialog } from './ui/promotion.js';
+import { createGameDialog } from './ui/game-dialog.js';
 import { createDebug, createBoardDebug } from './debug/debug.js';
 import { createDebugHud } from './debug/debug-hud.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   overlay: $('overlay'), touchpad: $('touchpad'), status: $('status'), hud: $('hud'),
-  reset: $('reset'), debug: $('btn-debug'), anchor: $('btn-anchor'),
-  zoomIn: $('btn-zoom-in'), zoomOut: $('btn-zoom-out'), promotion: $('promotion-dialog')
+  reset: $('reset'), resign: $('btn-resign'), debug: $('btn-debug'), anchor: $('btn-anchor'),
+  zoomIn: $('btn-zoom-in'), zoomOut: $('btn-zoom-out'), promotion: $('promotion-dialog'),
+  gameDialog: $('game-dialog'), gameTitle: $('game-title'), gameMessage: $('game-message'),
+  gamePrimary: $('game-primary'), gameSecondary: $('game-secondary')
 };
 
 // ---- modules
 const hud = createHud({ statusEl: el.status, hudEl: el.hud, btnDebug: el.debug, btnAnchor: el.anchor });
 const app = createXRSession({ overlay: el.overlay, log: hud.log });
-const requestedFen = new URLSearchParams(location.search).get('fen');
+const requestedFen = FLAGS.debug || FLAGS.selectionDebug ? new URLSearchParams(location.search).get('fen') : null;
 let game;
 try {
   game = new Game(requestedFen === null ? undefined : requestedFen);
@@ -35,6 +38,25 @@ try {
 const content = createBoardScene({ game });
 const hints = new MoveHints({ root: content.boardRoot });
 const animator = new MoveAnimator({ boardView: content.boardView });
+const DRAW_LABELS = {
+  'insufficient-material': 'insufficient material',
+  'threefold-repetition': 'threefold repetition',
+  'fifty-move-rule': 'the fifty-move rule'
+};
+const sideName = (side) => side[0].toUpperCase() + side.slice(1);
+function statusText(status, san) {
+  if (status.state === 'checkmate') return `Checkmate: ${sideName(status.winner)} wins.`;
+  if (status.state === 'stalemate') return 'Stalemate: draw.';
+  if (status.state === 'resigned') return `${sideName(status.loser)} resigned. ${sideName(status.winner)} wins.`;
+  if (status.state === 'draw') return `Draw: ${DRAW_LABELS[status.reason] ?? 'draw'}.`;
+  const move = san ? ` · ${san}` : '';
+  return `${sideName(status.turn)} to move${status.state === 'check' ? ' - check' : ''}${move}.`;
+}
+function updateGameStatus(status, san) {
+  hud.setCheck(status.state === 'check');
+  hints.setCheckedKing(status.inCheck ? game.kingSquare(status.inCheck) : null);
+  hud.setStatus(statusText(status, san));
+}
 const boardDebug = createBoardDebug();
 content.boardRoot.add(boardDebug);
 const dbg = createDebug(app.scene);
@@ -54,17 +76,31 @@ const placement = createPlacement({
   hooks: {
     onReset() {
       el.reset.hidden = true;
+      el.resign.hidden = true;
       interaction?.clearSelection();
+      hints.setCheckedKing(null);
+      hud.setCheck(false);
       hud.setStatus('Scan a flat surface (move the phone slowly). Tap when the cyan grid sits where you want the board. Pinch to resize.');
     },
     onPlaced() {
       el.reset.hidden = false;
-      hud.setStatus(`${game.turn()[0].toUpperCase() + game.turn().slice(1)} to move.`);
+      el.resign.hidden = false;
+      updateGameStatus(game.status());
+      if (game.status().over) gameDialog.showResult(game.status());
       hud.log('board placed');
     }
   }
 });
 const debugHud = createDebugHud({ app, placement, dbg, content, hud });
+const gameDialog = createGameDialog({
+  element: el.gameDialog,
+  title: el.gameTitle,
+  message: el.gameMessage,
+  primary: el.gamePrimary,
+  secondary: el.gameSecondary,
+  onNewGame: startNewGame,
+  onResign: resignGame
+});
 let debugOn = false;      // debug HUD + layers (see setDebug)
 let attaching = false;    // debug hit-test fan is being created
 let lastTapTime = -Infinity;
@@ -79,6 +115,8 @@ interaction = createInteraction({
   hints,
   animator,
   hud,
+  onStatus: updateGameStatus,
+  onGameOver: (status) => gameDialog.showResult(status),
   selectionDebug: FLAGS.selectionDebug,
   onPromotionRequired: (color) => promotionDialog.show(color)
 });
@@ -118,6 +156,9 @@ const zoom = (factor) => hud.flashStatus(`Board scale ×${content.setBoardScale(
 el.zoomIn.addEventListener('click', () => zoom(SCALE.STEP));
 el.zoomOut.addEventListener('click', () => zoom(1 / SCALE.STEP));
 el.reset.addEventListener('click', () => placement.reset());
+el.resign.addEventListener('click', () => {
+  if (placement.state.phase === 'playing' && !game.status().over) gameDialog.showResign();
+});
 el.anchor.addEventListener('click', () => hud.setAnchorButton(placement.toggleAnchor()));
 el.debug.addEventListener('click', () => setDebug(!debugOn));
 
@@ -150,9 +191,29 @@ function setDebug(on) {
   }
 }
 
+function startNewGame() {
+  animator.cancel();
+  promotionDialog.close();
+  interaction.cancelPromotion();
+  game.reset();
+  content.boardView.syncFrom(game);
+  hints.clear();
+  interaction.clearSelection();
+  updateGameStatus(game.status());
+  el.resign.hidden = placement.state.phase !== 'playing';
+  hud.log('new game');
+}
+
+function resignGame() {
+  if (!game.resign()) return;
+  const status = game.status();
+  updateGameStatus(status);
+  gameDialog.showResult(status);
+}
+
 // ---- frame hooks
 app.onXRFrame((ts, frame, refSpace) => { if (debugOn && dbg.ready) dbg.update(frame, refSpace); });
-app.onTick((ts) => animator.update(ts));
+app.onTick((ts) => { animator.update(ts); hints.update(ts); });
 app.onAfterRender((ts) => {
   if (debugOn && ts - lastHudTs > 250) { lastHudTs = ts; debugHud.update(); }
 });
@@ -167,6 +228,7 @@ app.onSessionStart(() => {
 app.onSessionEnd(() => {
   document.body.classList.remove('ar-active');
   promotionDialog.close();
+  gameDialog.close();
   interaction.cancelPromotion();
   interaction.clearSelection();
   dbg.detach();

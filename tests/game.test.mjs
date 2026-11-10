@@ -255,3 +255,20 @@ test('history() lists SAN moves; ids stay unique after a long sequence', () => {
   assert.equal(ids(g).size, g.pieces().length);
   assert.equal(at(g, 'f1').id, 'white-r-h1');
 });
+
+test('resignation ends play and reset clears the result', () => {
+  const g = new Game();
+  assert.equal(g.resign(), true);
+  assert.deepEqual(g.status(), {
+    turn: 'white', winner: 'black', loser: 'white', over: true,
+    inCheck: null, reason: 'resignation', state: 'resigned'
+  });
+  assert.deepEqual(g.tryMove('e2', 'e4'), { ok: false, reason: 'game-over' });
+  assert.equal(g.resign(), false);
+
+  assert.equal(g.reset().ok, true);
+  assert.equal(g.status().state, 'playing');
+  assert.equal(g.resign('black'), true);
+  assert.equal(g.load('not a fen').ok, false);
+  assert.equal(g.status().state, 'resigned');
+});

@@ -29,6 +29,7 @@ export class Game {
       return { ok: false, error: err.message };
     }
     this.snapshots = [];
+    this.resigned = null;
     this.#rebuildIds();
     return { ok: true };
   }
@@ -93,6 +94,9 @@ export class Game {
     const c = this.chess;
     const turn = this.turn();
     const base = { turn, winner: null, loser: null, over: false, inCheck: null, reason: null };
+    if (this.resigned) {
+      return { ...base, state: 'resigned', winner: OTHER[this.resigned], loser: this.resigned, over: true, reason: 'resignation' };
+    }
     if (c.isCheckmate()) {
       return { ...base, state: 'checkmate', winner: OTHER[turn], loser: turn, over: true, inCheck: turn, reason: 'checkmate' };
     }
@@ -105,6 +109,13 @@ export class Game {
   }
 
   // ------------------------------------------------------------ actions
+  /** Ends the game by resignation. Returns false if the game is already over. */
+  resign(color = this.turn()) {
+    if (this.status().over || !OTHER[color]) return false;
+    this.resigned = color;
+    return true;
+  }
+
   /**
    * Tries to play a move. Never throws.
    * @returns {{ok:true, move:object, events:object[], status:object} | {ok:false, reason:string}}

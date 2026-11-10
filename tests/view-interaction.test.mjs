@@ -33,14 +33,19 @@ test('move hints pool empty, capture, selected, and last-move overlays', () => {
   ]);
   hints.setLastMove({ from: 'e2', to: 'e4' });
   hints.setSelected('e7');
+  hints.setCheckedKing('e8');
 
   assert.equal(hints.emptyTargets.count, 1);
   assert.equal(hints.captureTargets.count, 1);
   assert.equal(hints.focus.count, 3);
+  assert.equal(hints.checkPulse.visible, true);
+  hints.update(100);
+  assert.ok(hints.checkPulse.material.opacity >= 0.5);
   hints.clear();
   assert.equal(hints.emptyTargets.count, 0);
   assert.equal(hints.captureTargets.count, 0);
   assert.equal(hints.focus.count, 0);
+  assert.equal(hints.checkPulse.visible, false);
 });
 
 test('knight slide uses an arc and settles exactly on its legal destination', () => {
@@ -62,6 +67,25 @@ test('knight slide uses an arc and settles exactly on its legal destination', ()
   assert.ok(Math.abs(end.x - 0.075) < 1e-6);
   assert.ok(Math.abs(end.z - 0.075) < 1e-6);
   assert.ok(Math.abs(end.y - SURFACE_Y) < 1e-6);
+});
+
+test('move animation can be cancelled before a game reset', () => {
+  const game = new Game();
+  const view = new BoardView(game);
+  const before = snapshots(view, ['white-p-e2']);
+  const result = game.tryMove('e2', 'e4');
+  assert.ok(result.ok);
+  view.syncFrom(game);
+  const animator = new MoveAnimator({ boardView: view, duration: 100 });
+  animator.start(result.move, before);
+
+  assert.equal(animator.busy, true);
+  animator.cancel();
+
+  assert.equal(animator.busy, false);
+  assert.equal(animator.actions.length, 0);
+  assert.equal(view.captureGhost.visible, false);
+  assert.equal(view.promotionGhost.visible, false);
 });
 
 test('castling animates king and rook; captures fade a temporary piece', () => {

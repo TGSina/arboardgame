@@ -17,6 +17,7 @@ export class MoveHints {
     this.selectedSquare = null;
     this.lastMove = null;
     this.selectionDebug = false;
+    this.checkedSquare = null;
 
     this.emptyTargets = new THREE.InstancedMesh(
       new THREE.CircleGeometry(0.009, 20).rotateX(-Math.PI / 2),
@@ -33,6 +34,12 @@ export class MoveHints {
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }),
       3
     );
+    this.checkPulse = new THREE.Mesh(
+      new THREE.RingGeometry(0.026, 0.031, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xf04444, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide })
+    );
+    this.checkPulse.name = 'checked-king-pulse';
+    this.checkPulse.visible = false;
 
     this.emptyTargets.name = 'empty-move-hints';
     this.captureTargets.name = 'capture-move-hints';
@@ -40,7 +47,7 @@ export class MoveHints {
     this.emptyTargets.count = 0;
     this.captureTargets.count = 0;
     this.focus.count = 0;
-    this.root.add(this.emptyTargets, this.captureTargets, this.focus);
+    this.root.add(this.emptyTargets, this.captureTargets, this.focus, this.checkPulse);
     root.add(this.root);
   }
 
@@ -74,6 +81,22 @@ export class MoveHints {
     this.#updateFocus();
   }
 
+  setCheckedKing(square) {
+    this.checkedSquare = square;
+    this.checkPulse.visible = Boolean(square);
+    if (!square) return;
+    const checked = squareToColRow(square);
+    this.checkPulse.position.set((checked.col - 3.5) * SQUARE, HINT_Y + 0.001, (checked.row - 3.5) * SQUARE);
+    this.checkPulse.scale.setScalar(1);
+  }
+
+  update(timestamp) {
+    if (!this.checkedSquare) return;
+    const pulse = (Math.sin(timestamp * 0.007) + 1) / 2;
+    this.checkPulse.scale.setScalar(0.86 + pulse * 0.24);
+    this.checkPulse.material.opacity = 0.5 + pulse * 0.45;
+  }
+
   setLastMove(move) {
     this.lastMove = move ? { from: move.from, to: move.to } : null;
     this.#updateFocus();
@@ -83,6 +106,7 @@ export class MoveHints {
     this.clearTargets();
     this.setSelected(null);
     this.setLastMove(null);
+    this.setCheckedKing(null);
   }
 
   #setSquareMatrix(mesh, instanceId, col, row, y) {

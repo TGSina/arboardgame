@@ -18,6 +18,9 @@
       <pre id="hud"></pre>
     </div>
     <div id="controls">
+      <div id="game-controls" class="control-group">
+        <button id="btn-resign" type="button" hidden>Resign</button>
+      </div>
       <div id="debug-controls" class="control-group">
         <button id="btn-debug">Debug: ON</button>
         <button id="btn-anchor">Anchor: ON</button>
@@ -36,6 +39,16 @@
           <button type="button" data-promotion="r" aria-label="Promote to rook">R</button>
           <button type="button" data-promotion="b" aria-label="Promote to bishop">B</button>
           <button type="button" data-promotion="n" aria-label="Promote to knight">N</button>
+        </div>
+      </div>
+    </div>
+    <div id="game-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="game-title" aria-describedby="game-message">
+      <div class="game-panel">
+        <h2 id="game-title"></h2>
+        <p id="game-message"></p>
+        <div class="game-actions">
+          <button id="game-primary" type="button"></button>
+          <button id="game-secondary" type="button"></button>
         </div>
       </div>
     </div>
